@@ -138,7 +138,7 @@ YpredVal = YpredVal(:,1:size(Y,2));
 [ax,ay,t,auc]=perfcurve(reshape(Y,1,numel(Y)),reshape(YpredVal,1,numel(Y)),1);
 auc1=get_auc(Y,YpredVal);
 [acc,vecacc,pre,rec,f1]=get_performance(Y,(YpredVal>=0.5));
-perf=[perf;[acc,vecacc,pre,rec,f1,auc,auc1]];
+perf=[perf;[acc,vecacc,pre,rec,f1,auc,auc1]];perf
 dlmwrite(sprintf('../predictions/%s_predValMTL',name{1}),YpredVal)
 dlmwrite(sprintf('../predictions/%s_predBinMTL',name{1}),YpredVal>=0.5)
 
