@@ -110,11 +110,11 @@ perf=[perf;[acc,vecacc,pre,rec,f1,auc,auc1]];perf
 %
 %------------
 gammas=0.1;
+iterations=1;
 method_str='feat';
 epsilon_init=1;
 fname='tmpmtl';
 cv_size=1;
-iterations=1;
 Dini=diag(repmat(1/size(K,1),size(K,1),1));
 YpredVal=[];
 for k=1:nfold
@@ -140,6 +140,7 @@ auc1=get_auc(Y,YpredVal);
 [acc,vecacc,pre,rec,f1]=get_performance(Y,(YpredVal>=0.5));
 perf=[perf;[acc,vecacc,pre,rec,f1,auc,auc1]];
 dlmwrite(sprintf('../predictions/%s_predValMTL',name{1}),YpredVal)
+dlmwrite(sprintf('../predictions/%s_predBinMTL',name{1}),YpredVal>=0.5)
 
 % save results
 dlmwrite(sprintf('../results/%s_perfMTL',name{1}),perf)
