@@ -1,5 +1,5 @@
 
-function rtn = run_mdensMMCRF()
+function rtn = run_MTL()
 
 % add path of libsvm
 addpath '~/softwares/libsvm-3.12/matlab/'
