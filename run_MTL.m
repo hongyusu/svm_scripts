@@ -116,6 +116,7 @@ epsilon_init=1;
 fname='tmpmtl';
 cv_size=1;
 Dini=diag(repmat(1/size(K,1),size(K,1),1));
+Dini(size(Dini,1),size(Dini,1))=Dini(size(Dini,1),size(Dini,1))+1-sum(sum(Dini));
 YpredVal=[];
 for k=1:nfold
     Itrain = find(Ind ~= k);
