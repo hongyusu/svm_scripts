@@ -109,12 +109,35 @@ perf=[perf;[acc,vecacc,pre,rec,f1,auc,auc1]];perf
 % MTL
 %
 %------------
-gammas=0.1;
-iterations=1;
+% parameter selection
+gammas=[0.01,0.1,1,10];
+iterations=5;
 method_str='feat';
-epsilon_init=1;
 fname='tmpmtl';
+epsilon_init=1;
 cv_size=1;
+Dini=diag(repmat(1/size(K,1),size(K,1),1));
+Dini(size(Dini,1),size(Dini,1))=Dini(size(Dini,1),size(Dini,1))+1-sum(sum(Dini));
+Isel = randsample(1:size(K,1),ceil(size(K,1)*.05));
+IselTrain=Isel(1:ceil(numel(Isel)/3*2));
+IselTest=Isel(1:ceil(numel(Isel)/3));
+selRes=gammas*0;
+for i=1:numel(gammas)
+    gamma=gammas(i);
+    trainx = K(:,repmat(IselTrain,1,size(Y,2)));
+    testx = K(:,repmat(IselTest,1,size(Y,2)));
+    task_indexes=[1:length(IselTrain):length(IselTrain)*size(Y,2)];
+    task_indexes_test=[1:length(IselTest):length(IselTest)*size(Y,2)];
+    Y_tr = Y(IselTrain,:); Y_tr(Y_tr==0)=-1; Y_tr=reshape(Y_tr,numel(Y_tr),1);
+    Y_ts = Y(IselTest,:); Y_ts(Y_ts==0)=-1; Y_ts=reshape(Y_ts,numel(Y_ts),1);
+    % running
+    rtn = code_example(gamma,trainx,Y_tr,testx,Y_ts,task_indexes,task_indexes_test,cv_size,Dini,iterations,method_str, epsilon_init, fname);
+    selRes(i)=sum(sum(Y_ts==(rtn>0.5)));
+end
+gamma=gammas(find(selRes==max(selRes)));
+
+% running
+iterations=10;
 Dini=diag(repmat(1/size(K,1),size(K,1),1));
 Dini(size(Dini,1),size(Dini,1))=Dini(size(Dini,1),size(Dini,1))+1-sum(sum(Dini));
 YpredVal=[];
@@ -128,7 +151,7 @@ for k=1:nfold
     Y_tr = Y(Itrain,:); Y_tr(Y_tr==0)=-1; Y_tr=reshape(Y_tr,numel(Y_tr),1);
     Y_ts = Y(Itest,:); Y_ts(Y_ts==0)=-1; Y_ts=reshape(Y_ts,numel(Y_ts),1);
     % running
-    rtn = code_example(gammas,trainx,Y_tr,testx,Y_ts,task_indexes,task_indexes_test,cv_size,Dini,iterations,method_str, epsilon_init, fname);
+    rtn = code_example(gamma,trainx,Y_tr,testx,Y_ts,task_indexes,task_indexes_test,cv_size,Dini,iterations,method_str, epsilon_init, fname);
     Ypred_ts_val=reshape(rtn,length(Itest),size(Y,2));
     YpredVal = [YpredVal;[Ypred_ts_val,Itest]];
 end
