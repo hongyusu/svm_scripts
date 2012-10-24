@@ -157,8 +157,8 @@ for k=1:nfold
     testx = K(:,repmat(Itest,1,size(Y,2)));
     task_indexes=[1:length(Itrain):length(Itrain)*size(Y,2)];
     task_indexes_test=[1:length(Itest):length(Itest)*size(Y,2)];
-    Y_tr = Y(Itrain,:); Y_tr(Y_tr==0)=-1; Y_tr=reshape(Y_tr,numel(Y_tr),1);
-    Y_ts = Y(Itest,:); Y_ts(Y_ts==0)=-1; Y_ts=reshape(Y_ts,numel(Y_ts),1);
+    Y_tr = Y(Itrain,:); Y_tr=reshape(Y_tr,numel(Y_tr),1);
+    Y_ts = Y(Itest,:); Y_ts=reshape(Y_ts,numel(Y_ts),1);
     % running
     rtn = code_example(gamma,trainx,Y_tr,testx,Y_ts,task_indexes,task_indexes_test,cv_size,Dini,iterations,method_str, epsilon_init, fname);
     Ypred_ts_val=reshape(rtn,length(Itest),size(Y,2));
