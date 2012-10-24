@@ -113,7 +113,7 @@ perf=[perf;[acc,vecacc,pre,rec,f1,auc,auc1]];perf
 if ~or(strcmp(name{1},'fp'),strcmp(name{1},'cancer'))
     K=X'; 
 end
-gammas=[0.01,0.1,1,5,10];
+gammas=[0.001,0.01,0.1,1,5,10];
 iterations=10;
 method_str='feat';
 fname='tmpmtl';
