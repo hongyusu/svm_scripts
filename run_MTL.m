@@ -110,15 +110,18 @@ perf=[perf;[acc,vecacc,pre,rec,f1,auc,auc1]];perf
 %
 %------------
 % parameter selection
-gammas=[0.01,0.1,1,10];
-iterations=5;
+if ~or(strcmp(name{1},'fp'),strcmp(name{1},'cancer'))
+    K=X'; 
+end
+gammas=[0.01,0.1,1,5,10];
+iterations=10;
 method_str='feat';
 fname='tmpmtl';
 epsilon_init=1;
 cv_size=1;
 Dini=diag(repmat(1/size(K,1),size(K,1),1));
 Dini(size(Dini,1),size(Dini,1))=Dini(size(Dini,1),size(Dini,1))+1-sum(sum(Dini));
-Isel = randsample(1:size(K,1),ceil(size(K,1)*.05));
+Isel = randsample(1:size(K,2),ceil(size(K,2)*.05));
 IselTrain=Isel(1:ceil(numel(Isel)/3*2));
 IselTest=Isel(1:ceil(numel(Isel)/3));
 selRes=gammas*0;
@@ -135,6 +138,12 @@ for i=1:numel(gammas)
     selRes(i)=sum(sum(Y_ts==(rtn>=0.5)));
 end
 gamma=gammas(find(selRes==max(selRes)));
+if numel(gamma) >1
+    gamma=gamma(1);
+end
+
+selRes
+gamma
 
 % running
 iterations=10;
