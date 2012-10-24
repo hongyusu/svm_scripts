@@ -113,7 +113,7 @@ perf=[perf;[acc,vecacc,pre,rec,f1,auc,auc1]];perf
 if ~or(strcmp(name{1},'fp'),strcmp(name{1},'cancer'))
     K=X'; 
 end
-gammas=[0.001,0.01,0.1,1,5,10];
+gammas=[0.001,0.01]%,0.1,1,5,10];
 iterations=10;
 method_str='feat';
 fname='tmpmtl';
@@ -131,8 +131,8 @@ for i=1:numel(gammas)
     testx = K(:,repmat(IselTest,1,size(Y,2)));
     task_indexes=[1:length(IselTrain):length(IselTrain)*size(Y,2)];
     task_indexes_test=[1:length(IselTest):length(IselTest)*size(Y,2)];
-    Y_tr = Y(IselTrain,:); Y_tr(Y_tr==0)=-1; Y_tr=reshape(Y_tr,numel(Y_tr),1);
-    Y_ts = Y(IselTest,:); Y_ts(Y_ts==0)=-1; Y_ts=reshape(Y_ts,numel(Y_ts),1);
+    Y_tr = Y(IselTrain,:);  Y_tr=reshape(Y_tr,numel(Y_tr),1);
+    Y_ts = Y(IselTest,:); Y_ts=reshape(Y_ts,numel(Y_ts),1);
     % running
     rtn = code_example(gamma,trainx,Y_tr,testx,Y_ts,task_indexes,task_indexes_test,cv_size,Dini,iterations,method_str, epsilon_init, fname);
     selRes(i)=sum(sum(Y_ts==(rtn>=0.5)));
