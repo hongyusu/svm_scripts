@@ -1,5 +1,5 @@
 
-function rtn = run_MTL()
+function rtn = run_SVM()
 
 % add path of libsvm
 addpath '~/softwares/libsvm-3.12/matlab/'
@@ -106,77 +106,78 @@ perf=[perf;[acc,vecacc,pre,rec,f1,auc,auc1]];perf
 
 %------------
 %
-% MTL
+% SVM
 %
 %------------
 % parameter selection
-if ~or(strcmp(name{1},'fp'),strcmp(name{1},'cancer'))
-    K=X'; 
-end
-gammas=[0.001,0.01]%,0.1,1,5,10];
-iterations=10;
-method_str='feat';
-fname='tmpmtl';
-epsilon_init=1;
-cv_size=1;
-Dini=diag(repmat(1/size(K,1),size(K,1),1));
-Dini(size(Dini,1),size(Dini,1))=Dini(size(Dini,1),size(Dini,1))+1-sum(sum(Dini));
+svm_cs=[0.01,0.1,1,5,10];
 Isel = randsample(1:size(K,2),ceil(size(K,2)*.05));
 IselTrain=Isel(1:ceil(numel(Isel)/3*2));
 IselTest=Isel(1:ceil(numel(Isel)/3));
-selRes=gammas*0;
-for i=1:numel(gammas)
-    gamma=gammas(i);
-    trainx = K(:,repmat(IselTrain,1,size(Y,2)));
-    testx = K(:,repmat(IselTest,1,size(Y,2)));
-    task_indexes=[1:length(IselTrain):length(IselTrain)*size(Y,2)];
-    task_indexes_test=[1:length(IselTest):length(IselTest)*size(Y,2)];
-    Y_tr = Y(IselTrain,:);  Y_tr=reshape(Y_tr,numel(Y_tr),1);
-    Y_ts = Y(IselTest,:); Y_ts=reshape(Y_ts,numel(Y_ts),1);
-    % running
-    rtn = code_example(gamma,trainx,Y_tr,testx,Y_ts,task_indexes,task_indexes_test,cv_size,Dini,iterations,method_str, epsilon_init, fname);
-    selRes(i)=sum(sum(Y_ts==(rtn>=0.5)));
+selRes=svm_cs*0;
+for j=1:numel(svm_cs)
+    svm_c=svm_cs(j);
+    Ypred = [];
+    YpredVal = [];
+    for i=1:Ny
+            model = svmtrain(Y(IselTrain,i),[(1:numel(IselTrain))',K(IselTrain,IselTrain)],sprintf('-b 1 -q -c %.2f -t 4',svm_c));
+            [Ynew,acc,YnewVal] = svmpredict(Y(IselTest,k),[(1:numel(IselTest))',K(IselTest,IselTrain)],model,'-b 1');
+            if size(YnewVal,2)==2
+                YnewVal=YnewVal(:,abs(model.Label(1,:)-1)+1);
+            else
+                YnewVal=zeros(numel(IselTest),1);
+            end
+            Ypred=[Ypred,YnewVal>0.5];
+            YpredVal=[YpredVal,YnewVal];
+    end
+    selRes(j)=sum(sum(Ypred==Y(IselTest,:)));
 end
-gamma=gammas(find(selRes==max(selRes)));
-if numel(gamma) >1
-    gamma=gamma(1);
+svm_c=svm_cs(find(selRes==max(selRes)));
+if numel(svm_c) >1
+    svm_c=svm_c(1);
 end
 
 selRes
-gamma
+svm_c
 
-% running
-iterations=10;
-Dini=diag(repmat(1/size(K,1),size(K,1),1));
-Dini(size(Dini,1),size(Dini,1))=Dini(size(Dini,1),size(Dini,1))+1-sum(sum(Dini));
-YpredVal=[];
-for k=1:nfold
-    Itrain = find(Ind ~= k);
-    Itest  = find(Ind == k);
-    trainx = K(:,repmat(Itrain,1,size(Y,2)));
-    testx = K(:,repmat(Itest,1,size(Y,2)));
-    task_indexes=[1:length(Itrain):length(Itrain)*size(Y,2)];
-    task_indexes_test=[1:length(Itest):length(Itest)*size(Y,2)];
-    Y_tr = Y(Itrain,:); Y_tr=reshape(Y_tr,numel(Y_tr),1);
-    Y_ts = Y(Itest,:); Y_ts=reshape(Y_ts,numel(Y_ts),1);
-    % running
-    rtn = code_example(gamma,trainx,Y_tr,testx,Y_ts,task_indexes,task_indexes_test,cv_size,Dini,iterations,method_str, epsilon_init, fname);
-    Ypred_ts_val=reshape(rtn,length(Itest),size(Y,2));
-    YpredVal = [YpredVal;[Ypred_ts_val,Itest]];
+Ypred = [];
+YpredVal = [];
+% iterate on targets (Y1 -> Yx -> Ym)
+for i=1:Ny
+    % nfold cross validation
+    Ycol = [];
+    YcolVal = [];
+    for k=1:nfold
+        Itrain = find(Ind ~= k);
+        Itest  = find(Ind == k);
+        % training & testing with kernel
+        model = svmtrain(Y(Itrain,i),[(1:numel(Itrain))',K(Itrain,Itrain)],sprintf('-b 1 -q -c %.2f -t 4',svm_c));
+        [Ynew,acc,YnewVal] = svmpredict(Y(Itest,k),[(1:numel(Itest))',K(Itest,Itrain)],model,'-b 1');
+        [Ynew] = svmpredict(Y(Itest,k),[(1:numel(Itest))',K(Itest,Itrain)],model);
+        Ycol = [Ycol;[Ynew,Itest]];
+        if size(YnewVal,2)==2
+            YcolVal = [YcolVal;[YnewVal(:,abs(model.Label(1,:)-1)+1),Itest]];
+        else
+            YcolVal = [YcolVal;[zeros(numel(Itest),1),Itest]];
+        end
+    end
+    Ycol = sortrows(Ycol,size(Ycol,2));
+    Ypred = [Ypred,Ycol(:,1)];
+    YcolVal = sortrows(YcolVal,size(YcolVal,2));
+    YpredVal = [YpredVal,YcolVal(:,1)];
 end
-YpredVal = sortrows(YpredVal,size(YpredVal,2));
-YpredVal = YpredVal(:,1:size(Y,2));
-
-% auc & roc mtl
+% performance of svm
 [ax,ay,t,auc]=perfcurve(reshape(Y,1,numel(Y)),reshape(YpredVal,1,numel(Y)),1);
 auc1=get_auc(Y,YpredVal);
-[acc,vecacc,pre,rec,f1]=get_performance(Y,(YpredVal>=0.5));
+[acc,vecacc,pre,rec,f1]=get_performance(Y,Ypred);
 perf=[perf;[acc,vecacc,pre,rec,f1,auc,auc1]];perf
-dlmwrite(sprintf('../predictions/%s_predValMTL',name{1}),YpredVal)
-dlmwrite(sprintf('../predictions/%s_predBinMTL',name{1}),YpredVal>=0.5)
+
+
+dlmwrite(sprintf('../predictions/%s_predValSVM',name{1}),YpredVal)
+dlmwrite(sprintf('../predictions/%s_predBinSVM',name{1}),YpredVal>=0.5)
 
 % save results
-dlmwrite(sprintf('../results/%s_perfMTL',name{1}),perf)
+dlmwrite(sprintf('../results/%s_perfSVM',name{1}),perf)
 end
 
 rtn = [];
