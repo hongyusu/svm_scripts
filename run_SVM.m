@@ -164,7 +164,7 @@ for i=1:Ny
         else
             YnewVal=zeros(numel(Itest),1);
         end
-        YcolVal = [YcolVal;[Ynew,Itest]];
+        YcolVal = [YcolVal;[YnewVal,Itest]];
     end
     YcolVal = sortrows(YcolVal,size(YcolVal,2));
     YpredVal = [YpredVal,YcolVal(:,1)];
