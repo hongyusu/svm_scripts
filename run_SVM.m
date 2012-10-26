@@ -3,7 +3,7 @@ function rtn = run_SVM()
 
 % add path of libsvm
 addpath '~/softwares/libsvm-3.12/matlab/'
-
+addpath '../shared_scripts/'
 
 % actual running
 %for name={'emotions','yeast','scene','enron','cal500','fp','cancer','medical','toy10','toy50'}
@@ -12,11 +12,16 @@ addpath '~/softwares/libsvm-3.12/matlab/'
 
 % simulate testing
 for name={'toy10'}
-X=dlmread(sprintf('./test_data/%s_features',name{1}));
-Y=dlmread(sprintf('./test_data/%s_targets',name{1}));
+X=dlmread(sprintf('../shared_scripts/test_data/%s_features',name{1}));
+Y=dlmread(sprintf('../shared_scripts/test_data/%s_targets',name{1}));
 
 rand('twister', 0);
 
+%------------
+%
+% preparing     
+%
+%------------
 % example selection with meaningful features
 Xsum=sum(X,2);
 X=X(find(Xsum~=0),:);
@@ -78,7 +83,7 @@ for i=1:Ny
         if strcmp(name{1}(1:2),'to')
                 svm_c=0.01;
         elseif strcmp(name{1},'cancer')
-                svm_c=5
+                svm_c=5;
         else
                 svm_c=0.5;
         end
@@ -98,20 +103,18 @@ for i=1:Ny
     YpredVal = [YpredVal,YcolVal(:,1)];
 end
 % performance of svm
-[ax,ay,t,auc]=perfcurve(reshape(Y,1,numel(Y)),reshape(YpredVal,1,numel(Y)),1);
-auc1=get_auc(Y,YpredVal);
-[acc,vecacc,pre,rec,f1]=get_performance(Y,Ypred);
-perf=[perf;[acc,vecacc,pre,rec,f1,auc,auc1]];perf
+[acc,vecacc,pre,rec,f1,auc1,auc2]=get_performance(Y,Ypred,YpredVal);
+perf=[perf;[acc,vecacc,pre,rec,f1,auc1,auc2]];perf
 
 
 %------------
 %
-% SVM
+% SVM parameter selection
 %
 %------------
 % parameter selection
 svm_cs=[0.01,0.1,1,5,10];
-Isel = randsample(1:size(K,2),ceil(size(K,2)*.05));
+Isel = randsample(1:size(K,2),ceil(size(K,2)*.03));
 IselTrain=Isel(1:ceil(numel(Isel)/3*2));
 IselTest=Isel(1:ceil(numel(Isel)/3));
 selRes=svm_cs*0;
@@ -137,15 +140,18 @@ if numel(svm_c) >1
     svm_c=svm_c(1);
 end
 
-selRes
-svm_c
+pa=[selRes;svm_cs]
+dlmwrite(sprintf('../parameters/%s_para',name{1}),pa)
 
-Ypred = [];
+%------------
+%
+% single label SVM
+%
+%------------
 YpredVal = [];
 % iterate on targets (Y1 -> Yx -> Ym)
 for i=1:Ny
     % nfold cross validation
-    Ycol = [];
     YcolVal = [];
     for k=1:nfold
         Itrain = find(Ind ~= k);
@@ -153,45 +159,97 @@ for i=1:Ny
         % training & testing with kernel
         model = svmtrain(Y(Itrain,i),[(1:numel(Itrain))',K(Itrain,Itrain)],sprintf('-b 1 -q -c %.2f -t 4',svm_c));
         [Ynew,acc,YnewVal] = svmpredict(Y(Itest,k),[(1:numel(Itest))',K(Itest,Itrain)],model,'-b 1');
-        [Ynew] = svmpredict(Y(Itest,k),[(1:numel(Itest))',K(Itest,Itrain)],model);
-        Ycol = [Ycol;[Ynew,Itest]];
         if size(YnewVal,2)==2
-            YcolVal = [YcolVal;[YnewVal(:,abs(model.Label(1,:)-1)+1),Itest]];
+            YnewVal=YnewVal(:,abs(model.Label(1,:)-1)+1);
         else
-            YcolVal = [YcolVal;[zeros(numel(Itest),1),Itest]];
+            YnewVal=zeros(numel(Itest),1);
         end
+        YcolVal = [YcolVal;[Ynew,Itest]];
     end
-    Ycol = sortrows(Ycol,size(Ycol,2));
-    Ypred = [Ypred,Ycol(:,1)];
     YcolVal = sortrows(YcolVal,size(YcolVal,2));
     YpredVal = [YpredVal,YcolVal(:,1)];
 end
 % performance of svm
-[ax,ay,t,auc]=perfcurve(reshape(Y,1,numel(Y)),reshape(YpredVal,1,numel(Y)),1);
-auc1=get_auc(Y,YpredVal);
-[acc,vecacc,pre,rec,f1]=get_performance(Y,Ypred);
-perf=[perf;[acc,vecacc,pre,rec,f1,auc,auc1]];perf
-
-
+[acc,vecacc,pre,rec,f1,auc1,auc1]=get_performance(Y,YpredVal>0.5,YpredVal);
+perf=[perf;[acc,vecacc,pre,rec,f1,auc1,auc2]];perf
+% save results
 dlmwrite(sprintf('../predictions/%s_predValSVM',name{1}),YpredVal)
-dlmwrite(sprintf('../predictions/%s_predBinSVM',name{1}),YpredVal>=0.5)
+dlmwrite(sprintf('../predictions/%s_predBinSVM',name{1}),YpredVal>0.5)
+dlmwrite(sprintf('../results/%s_perfSVM',name{1}),perf)
+
+
+%------------
+%
+% bagging svm
+%
+%------------
+perf=perf(1,:);
+% bagging
+Nrep=2;
+per=1;
+rand('twister', 0);
+Ybag=Y*0;
+YbagVal=Y*0;
+perfBagSVM=[];
+perfRandSVM=[];
+for b=1:Nrep
+    YpredVal = [];
+    % iterate on targets (Y1 -> Yx -> Ym)
+    for i=1:Ny
+        % nfold cross validation
+        YcolVal = [];
+        for k=1:nfold
+            Itrain = find(Ind ~= k);
+            BagSize=ceil(numel(Itrain)*per);
+            Itrain=randsample(Itrain,BagSize);
+            Itest  = find(Ind == k);
+            model = svmtrain(Y(Itrain,i),[(1:numel(Itrain))',K(Itrain,Itrain)],sprintf('-b 1 -q -c %.2f -t 4',svm_c));
+            [Ynew,acc,YnewVal] = svmpredict(Y(Itest,k),[(1:numel(Itest))',K(Itest,Itrain)],model,'-b 1');
+            if size(YnewVal,2)==2
+                YnewVal=YnewVal(:,abs(model.Label(1,:)-1)+1);
+            else
+                YnewVal=zeros(numel(Itest),1);
+            end
+            YcolVal = [YcolVal;[YnewVal,Itest]];
+        end
+        YcolVal = sortrows(YcolVal,size(YcolVal,2));
+        YpredVal = [YpredVal,YcolVal(:,1)];
+    end
+    % performance of svm
+    [acc,vecacc,pre,rec,f1,auc1,auc2]=get_performance(Y,YpredVal>0.5,YpredVal);
+    perfRandSVM=[perfRandSVM;[acc,vecacc,pre,rec,f1,auc1,auc2]];
+   
+    % performance of bagging
+    YbagVal=YbagVal+YpredVal;
+    [acc,vecacc,pre,rec,f1,auc1,auc2]=get_performance(Y,YbagVal/b>0.5,YbagVal/b);
+    perfBagSVM=[perfBagSVM;[acc,vecacc,pre,rec,f1,auc1,auc2]];
+end
+perf=[perf;[acc,vecacc,pre,rec,f1,auc1,auc2]];perf
+
+dlmwrite(sprintf('../predictions/%s_predValBagSVM',name{1}),YbagVal/b>0.5)
+dlmwrite(sprintf('../predictions/%s_predBinBagSVM',name{1}),YbagVal/b)
 
 % save results
-dlmwrite(sprintf('../results/%s_perfSVM',name{1}),perf)
-end
+dlmwrite(sprintf('../results/%s_perfBagSVM',name{1}),perf)
+dlmwrite(sprintf('../results/%s_perfRandSVM',name{1}),perfRandSVM)
+dlmwrite(sprintf('../results/%s_perfBagSVMProce',name{1}),perfBagSVM)
 
+% plot data with true labels
+hFig = figure('visible','off');
+set(hFig, 'Position', [500,500,1200,50])
+subplot(1,5,1);plot(perfBagSVM(:,1));title('Bin accuracy');
+subplot(1,5,2);plot(perfBagSVM(:,2));title('multilabel accuracy');
+subplot(1,5,3);plot(perfBagSVM(:,5));title('F1');
+subplot(1,5,4);plot(perfBagSVM(:,6));title('AUC1');
+subplot(1,5,5);plot(perfBagSVM(:,7));title('AUC2');
+print(hFig, '-depsc',sprintf('../plots/%s_BagSVM.eps',name{1}));
+
+
+
+
+end
 rtn = [];
 end
 
-
-
-
-function [auc] = get_auc(Y,YpredVal)
-    AUC=zeros(1,size(Y,2));
-    for i=1:size(Y,2)
-        [ax,ay,t,AUC(1,i)]=perfcurve(Y(:,i),YpredVal(:,i),1);
-    end
-    auc=mean(AUC);
-end
 
 
