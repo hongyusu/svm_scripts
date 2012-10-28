@@ -41,6 +41,9 @@ if or(strcmp(name{1},'medical'),strcmp(name{1},'enron'))
 elseif ~(strcmp(name{1}(1:2),'to'))
     X=(X-repmat(min(X),size(X,1),1))./repmat(max(X)-min(X),size(X,1),1);
 end
+if strcmp(name{1}(1:2),'to')
+    X=X(:,1:2);
+end
 
 % change Y from -1 to 0: labeling (0/1)
 Y(Y==-1)=0;
@@ -115,23 +118,17 @@ perf=[perf;[acc,vecacc,pre,rec,f1,auc1,auc2]];perf
 % parameter selection
 svm_cs=[0.01,0.1,0.5,1,5,10];
 Isel = randsample(1:size(K,2),ceil(size(K,2)*.03));
-IselTrain=Isel(1:ceil(numel(Isel)/3*2));
-IselTest=Isel(1:ceil(numel(Isel)/3));
+numel(Isel)
+IselTrain=Isel(1:ceil(numel(Isel)/3));
+IselTest=Isel(ceil(numel(Isel)/3+1):numel(Isel));
 selRes=svm_cs*0;
 for j=1:numel(svm_cs)
     svm_c=svm_cs(j);
     Ypred = [];
-    YpredVal = [];
     for i=1:Ny
-            model = svmtrain(Y(IselTrain,i),[(1:numel(IselTrain))',K(IselTrain,IselTrain)],sprintf('-b 1 -q -c %.2f -t 4',svm_c));
-            [Ynew,acc,YnewVal] = svmpredict(Y(IselTest,k),[(1:numel(IselTest))',K(IselTest,IselTrain)],model,'-b 1');
-            if size(YnewVal,2)==2
-                YnewVal=YnewVal(:,abs(model.Label(1,:)-1)+1);
-            else
-                YnewVal=zeros(numel(IselTest),1);
-            end
-            Ypred=[Ypred,YnewVal>0.5];
-            YpredVal=[YpredVal,YnewVal];
+            model = svmtrain(Y(IselTrain,i),[(1:numel(IselTrain))',K(IselTrain,IselTrain)],sprintf('-b 0 -q -c %.2f -t 4',svm_c));
+            Ynew = svmpredict(Y(IselTest,k),[(1:numel(IselTest))',K(IselTest,IselTrain)],model,'-b 0');
+            Ypred=[Ypred,Ynew];
     end
     selRes(j)=sum(sum(Ypred==Y(IselTest,:)));
 end
@@ -141,42 +138,35 @@ if numel(svm_c) >1
 end
 
 pa=[selRes;svm_cs]
-dlmwrite(sprintf('../parameters/%s_para',name{1}),pa)
+dlmwrite(sprintf('../parameters/%s_paraSVM',name{1}),pa)
 
 %------------
 %
 % single label SVM
 %
 %------------
-YpredVal = [];
+Ypred = [];
 % iterate on targets (Y1 -> Yx -> Ym)
 for i=1:Ny
     % nfold cross validation
-    YcolVal = [];
+    Ycol = [];
     for k=1:nfold
         Itrain = find(Ind ~= k);
         Itest  = find(Ind == k);
         % training & testing with kernel
-        model = svmtrain(Y(Itrain,i),[(1:numel(Itrain))',K(Itrain,Itrain)],sprintf('-b 1 -q -c %.2f -t 4',svm_c));
-        [Ynew,acc,YnewVal] = svmpredict(Y(Itest,k),[(1:numel(Itest))',K(Itest,Itrain)],model,'-b 1');
-        if size(YnewVal,2)==2
-            YnewVal=YnewVal(:,abs(model.Label(1,:)-1)+1);
-        else
-            YnewVal=zeros(numel(Itest),1);
-        end
-        YcolVal = [YcolVal;[YnewVal,Itest]];
+        model = svmtrain(Y(Itrain,i),[(1:numel(Itrain))',K(Itrain,Itrain)],sprintf('-b 0 -q -c %.2f -t 4',svm_c));
+        Ynew = svmpredict(Y(Itest,k),[(1:numel(Itest))',K(Itest,Itrain)],model,'-b 0');
+        Ycol = [Ycol;[Ynew,Itest]];
     end
-    YcolVal = sortrows(YcolVal,size(YcolVal,2));
-    YpredVal = [YpredVal,YcolVal(:,1)];
+    Ycol = sortrows(Ycol,size(Ycol,2));
+    Ypred = [Ypred,Ycol(:,1)];
 end
 % performance of svm
-[acc,vecacc,pre,rec,f1,auc1,auc1]=get_performance(Y,YpredVal>0.5,YpredVal);
+[acc,vecacc,pre,rec,f1,auc1,auc2]=get_performance(Y,Ypred);
 perf=[perf;[acc,vecacc,pre,rec,f1,auc1,auc2]];perf
 % save results
-dlmwrite(sprintf('../predictions/%s_predValSVM',name{1}),YpredVal)
-dlmwrite(sprintf('../predictions/%s_predBinSVM',name{1}),YpredVal>0.5)
+dlmwrite(sprintf('../predictions/%s_predBinSVM',name{1}),Ypred)
 dlmwrite(sprintf('../results/%s_perfSVM',name{1}),perf)
-
 
 %------------
 %
@@ -189,45 +179,38 @@ Nrep=2;
 per=1;
 rand('twister', 0);
 Ybag=Y*0;
-YbagVal=Y*0;
 perfBagSVM=[];
 perfRandSVM=[];
 for b=1:Nrep
-    YpredVal = [];
+    Ypred = [];
     % iterate on targets (Y1 -> Yx -> Ym)
     for i=1:Ny
         % nfold cross validation
-        YcolVal = [];
+        Ycol = [];
         for k=1:nfold
             Itrain = find(Ind ~= k);
             BagSize=ceil(numel(Itrain)*per);
             Itrain=randsample(Itrain,BagSize);
             Itest  = find(Ind == k);
-            model = svmtrain(Y(Itrain,i),[(1:numel(Itrain))',K(Itrain,Itrain)],sprintf('-b 1 -q -c %.2f -t 4',svm_c));
-            [Ynew,acc,YnewVal] = svmpredict(Y(Itest,k),[(1:numel(Itest))',K(Itest,Itrain)],model,'-b 1');
-            if size(YnewVal,2)==2
-                YnewVal=YnewVal(:,abs(model.Label(1,:)-1)+1);
-            else
-                YnewVal=zeros(numel(Itest),1);
-            end
-            YcolVal = [YcolVal;[YnewVal,Itest]];
+            model = svmtrain(Y(Itrain,i),[(1:numel(Itrain))',K(Itrain,Itrain)],sprintf('-b 0 -q -c %.2f -t 4',svm_c));
+            Ynew = svmpredict(Y(Itest,k),[(1:numel(Itest))',K(Itest,Itrain)],model,'-b 0');
+            Ycol = [Ycol;[Ynew,Itest]];
         end
-        YcolVal = sortrows(YcolVal,size(YcolVal,2));
-        YpredVal = [YpredVal,YcolVal(:,1)];
+        Ycol = sortrows(Ycol,size(Ycol,2));
+        Ypred = [Ypred,Ycol(:,1)];
     end
     % performance of svm
-    [acc,vecacc,pre,rec,f1,auc1,auc2]=get_performance(Y,YpredVal>0.5,YpredVal);
+    [acc,vecacc,pre,rec,f1,auc1,auc2]=get_performance(Y,Ypred);
     perfRandSVM=[perfRandSVM;[acc,vecacc,pre,rec,f1,auc1,auc2]];
    
     % performance of bagging
-    YbagVal=YbagVal+YpredVal;
-    [acc,vecacc,pre,rec,f1,auc1,auc2]=get_performance(Y,YbagVal/b>0.5,YbagVal/b);
+    Ybag=Ybag+Ypred;
+    [acc,vecacc,pre,rec,f1,auc1,auc2]=get_performance(Y,Ybag/b>0);
     perfBagSVM=[perfBagSVM;[acc,vecacc,pre,rec,f1,auc1,auc2]];
 end
 perf=[perf;[acc,vecacc,pre,rec,f1,auc1,auc2]];perf
 
-dlmwrite(sprintf('../predictions/%s_predValBagSVM',name{1}),YbagVal/b>0.5)
-dlmwrite(sprintf('../predictions/%s_predBinBagSVM',name{1}),YbagVal/b)
+dlmwrite(sprintf('../predictions/%s_predBinBagSVM',name{1}),Ybag/b>0)
 
 % save results
 dlmwrite(sprintf('../results/%s_perfBagSVM',name{1}),perf)
