@@ -11,7 +11,7 @@ addpath '../shared_scripts/'
 %Y=dlmread(sprintf('/fs/group/urenzyme/workspace/data/%s_targets',name{1}));
 
 % simulate testing
-for name={'toy10'}
+for name={'emotions'}
 X=dlmread(sprintf('../shared_scripts/test_data/%s_features',name{1}));
 Y=dlmread(sprintf('../shared_scripts/test_data/%s_targets',name{1}));
 
@@ -90,7 +90,7 @@ for i=1:Ny
         else
                 svm_c=0.5;
         end
-        model = svmtrain(Y(Itrain,i),[(1:numel(Itrain))',K(Itrain,Itrain)],sprintf('-b 1 -q -c %.2f -t 4',svm_c));
+        model = svmtrain(Y(Itrain,i),[(1:numel(Itrain))',K(Itrain,Itrain)],sprintf('-b 1 -q -s 0 -c %.2f -t 4',svm_c));
         [Ynew,acc,YnewVal] = svmpredict(Y(Itest,k),[(1:numel(Itest))',K(Itest,Itrain)],model,'-b 1');
         [Ynew] = svmpredict(Y(Itest,k),[(1:numel(Itest))',K(Itest,Itrain)],model);
         Ycol = [Ycol;[Ynew,Itest]];
@@ -118,21 +118,21 @@ perf=[perf;[acc,vecacc,pre,rec,f1,auc1,auc2]];perf
 % parameter selection
 svm_cs=[0.01,0.1,0.5,1,5,10];
 Isel = randsample(1:size(K,2),ceil(size(K,2)*.03));
-numel(Isel)
 IselTrain=Isel(1:ceil(numel(Isel)/3));
 IselTest=Isel(ceil(numel(Isel)/3+1):numel(Isel));
+
 selRes=svm_cs*0;
 for j=1:numel(svm_cs)
     svm_c=svm_cs(j);
     Ypred = [];
     for i=1:Ny
-            model = svmtrain(Y(IselTrain,i),[(1:numel(IselTrain))',K(IselTrain,IselTrain)],sprintf('-b 0 -q -c %.2f -t 4',svm_c));
-            Ynew = svmpredict(Y(IselTest,k),[(1:numel(IselTest))',K(IselTest,IselTrain)],model,'-b 0');
+            model = svmtrain(Y(IselTrain,i),[(1:numel(IselTrain))',K(IselTrain,IselTrain)],sprintf('-q -s 0 -c %.2f -t 4 -h 0 -m 1',svm_c));
+            Ynew = svmpredict(Y(IselTest,k),[(1:numel(IselTest))',K(IselTest,IselTrain)],model);
             Ypred=[Ypred,Ynew];
     end
     selRes(j)=sum(sum(Ypred==Y(IselTest,:)));
 end
-svm_c=svm_cs(find(selRes==max(selRes)));
+svm_c=svm_cs(max(find(selRes==max(selRes))-1,1));
 if numel(svm_c) >1
     svm_c=svm_c(1);
 end
@@ -154,8 +154,8 @@ for i=1:Ny
         Itrain = find(Ind ~= k);
         Itest  = find(Ind == k);
         % training & testing with kernel
-        model = svmtrain(Y(Itrain,i),[(1:numel(Itrain))',K(Itrain,Itrain)],sprintf('-b 0 -q -c %.2f -t 4',svm_c));
-        Ynew = svmpredict(Y(Itest,k),[(1:numel(Itest))',K(Itest,Itrain)],model,'-b 0');
+        model = svmtrain(Y(Itrain,i),[(1:numel(Itrain))',K(Itrain,Itrain)],sprintf('-q -s 0 -c %.2f -t 4',svm_c));
+        Ynew = svmpredict(Y(Itest,k),[(1:numel(Itest))',K(Itest,Itrain)],model);
         Ycol = [Ycol;[Ynew,Itest]];
     end
     Ycol = sortrows(Ycol,size(Ycol,2));
@@ -192,8 +192,8 @@ for b=1:Nrep
             BagSize=ceil(numel(Itrain)*per);
             Itrain=randsample(Itrain,BagSize);
             Itest  = find(Ind == k);
-            model = svmtrain(Y(Itrain,i),[(1:numel(Itrain))',K(Itrain,Itrain)],sprintf('-b 0 -q -c %.2f -t 4',svm_c));
-            Ynew = svmpredict(Y(Itest,k),[(1:numel(Itest))',K(Itest,Itrain)],model,'-b 0');
+            model = svmtrain(Y(Itrain,i),[(1:numel(Itrain))',K(Itrain,Itrain)],sprintf('-q -s 0 -c %.2f -t 4',svm_c));
+            Ynew = svmpredict(Y(Itest,k),[(1:numel(Itest))',K(Itest,Itrain)],model);
             Ycol = [Ycol;[Ynew,Itest]];
         end
         Ycol = sortrows(Ycol,size(Ycol,2));
