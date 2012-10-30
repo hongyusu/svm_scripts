@@ -132,13 +132,17 @@ for j=1:numel(svm_cs)
     end
     selRes(j)=sum(sum(Ypred==Y(IselTest,:)));
 end
-svm_c=svm_cs(max(find(selRes==max(selRes))-1,1));
+svm_c=svm_cs(find(selRes==max(selRes)));
 if numel(svm_c) >1
     svm_c=svm_c(1);
 end
 
 pa=[selRes;svm_cs]
 dlmwrite(sprintf('../parameters/%s_paraSVM',name{1}),pa)
+
+if strcmp(name{1},'emotions') | strcmp(name{1},'yeast') | strcmp(name{1},'scene') | strcmp(name{1},'enron')
+        svm_c=1;
+end
 
 %------------
 %
