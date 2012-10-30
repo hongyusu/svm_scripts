@@ -1,19 +1,25 @@
 
-function rtn = run_SVM()
+function rtn = run_SVM(inname)
 
 % add path of libsvm
 addpath '~/softwares/libsvm-3.12/matlab/'
 addpath '../shared_scripts/'
 
-% actual running
-%for name={'emotions','yeast','scene','enron','cal500','fp','cancer','medical','toy10','toy50'}
-%X=dlmread(sprintf('/fs/group/urenzyme/workspace/data/%s_features',name{1}));
-%Y=dlmread(sprintf('/fs/group/urenzyme/workspace/data/%s_targets',name{1}));
+if nargin ==0
+    names={'emotions','yeast','scene','enron','cal500','fp','cancer','medical','toy10','toy50'}
+else
+    names={inname}
+end
 
-% simulate testing
-for name={'emotions'}
-X=dlmread(sprintf('../shared_scripts/test_data/%s_features',name{1}));
-Y=dlmread(sprintf('../shared_scripts/test_data/%s_targets',name{1}));
+for name=names
+[sta,comres]=system('hostname');
+if strcmp(comres(1:4),'dave')
+    X=dlmread(sprintf('/fs/group/urenzyme/workspace/data/%s_features',name{1}));
+    Y=dlmread(sprintf('/fs/group/urenzyme/workspace/data/%s_targets',name{1}));
+else
+    X=dlmread(sprintf('../shared_scripts/test_data/%s_features',name{1}));
+    Y=dlmread(sprintf('../shared_scripts/test_data/%s_targets',name{1}));
+end
 
 rand('twister', 0);
 
