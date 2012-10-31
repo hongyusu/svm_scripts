@@ -119,7 +119,7 @@ perf=[perf;[acc,vecacc,pre,rec,f1,auc1,auc2]];perf
 %------------
 % parameter selection
 svm_cs=[0.01,0.1,0.5,1,5,10,100];
-Isel = randsample(1:size(K,2),ceil(size(K,2)*.5));
+Isel = randsample(1:size(K,2),ceil(size(K,2)*.25));
 IselTrain=Isel(1:ceil(numel(Isel)/3*2));
 IselTest=Isel(ceil(numel(Isel)/3*2+1):numel(Isel));
 
