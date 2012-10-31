@@ -147,7 +147,10 @@ pa=[selRes;svm_cs]
 dlmwrite(sprintf('../parameters/%s_paraSVM',name{1}),pa)
 
 if strcmp(name{1},'emotions') | strcmp(name{1},'yeast') | strcmp(name{1},'scene') | strcmp(name{1},'enron')
-        svm_c=0.5;
+        svm_c=1;
+end
+if strcmp(name{1},'enron')
+    svm_c=0.5
 end
 
 %------------
@@ -185,7 +188,7 @@ dlmwrite(sprintf('../results/%s_perfSVM',name{1}),perf)
 %------------
 perf=perf(1,:);
 % bagging
-Nrep=2;
+Nrep=60;
 per=1;
 rand('twister', 0);
 Ybag=Y*0;
