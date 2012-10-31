@@ -149,9 +149,6 @@ dlmwrite(sprintf('../parameters/%s_paraSVM',name{1}),pa)
 if strcmp(name{1},'emotions') | strcmp(name{1},'yeast') | strcmp(name{1},'scene') | strcmp(name{1},'enron')
         svm_c=1;
 end
-if strcmp(name{1},'enron')
-    svm_c=0.5
-end
 
 %------------
 %
