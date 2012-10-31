@@ -44,11 +44,6 @@ Y=Y(:,Yuniq);
 % feature normalization (tf-idf for text data, scale and centralization for other numerical features)
 if or(strcmp(name{1},'medical'),strcmp(name{1},'enron')) 
     X=tfidf(X);
-elseif ~(strcmp(name{1}(1:2),'to'))
-    X=(X-repmat(min(X),size(X,1),1))./repmat(max(X)-min(X),size(X,1),1);
-end
-if strcmp(name{1}(1:2),'to')
-    X=X(:,1:2);
 end
 
 % change Y from -1 to 0: labeling (0/1)
@@ -68,6 +63,7 @@ perf=[];
 % get dot product kernels from normalized features or just read precomputed kernels
 if or(strcmp(name{1},'fp'),strcmp(name{1},'cancer'))
     K=dlmread(sprintf('/fs/group/urenzyme/workspace/data/%s_kernel',name{1}));
+    X=K;
 else
     K = X * X'; % dot product
     K = K ./ sqrt(diag(K)*diag(K)');    %normalization diagonal is 1
@@ -132,8 +128,8 @@ for j=1:numel(svm_cs)
     svm_c=svm_cs(j);
     Ypred = [];
     for i=1:Ny
-            model = svmtrain(Y(IselTrain,i),[(1:numel(IselTrain))',K(IselTrain,IselTrain)],sprintf('-q -s 0 -c %.2f -t 4 -h 0 -m 1',svm_c));
-            Ynew = svmpredict(Y(IselTest,k),[(1:numel(IselTest))',K(IselTest,IselTrain)],model);
+            model = svmtrain(Y(IselTrain,i),X(IselTrain,:),sprintf('-q -s 0 -c %.2f -t 0',svm_c));
+            Ynew = svmpredict(Y(IselTest,k),X(IselTest,:),model);
             Ypred=[Ypred,Ynew];
     end
     selRes(j)=sum(sum(Ypred==Y(IselTest,:)));
@@ -146,8 +142,8 @@ end
 pa=[selRes;svm_cs]
 dlmwrite(sprintf('../parameters/%s_paraSVM',name{1}),pa)
 
-if strcmp(name{1},'emotions') | strcmp(name{1},'yeast') | strcmp(name{1},'scene') | strcmp(name{1},'enron')
-        svm_c=1;
+if strcmp(name{1}(1:2),'to')
+    svm_c=0.1
 end
 
 %------------
@@ -164,8 +160,8 @@ for i=1:Ny
         Itrain = find(Ind ~= k);
         Itest  = find(Ind == k);
         % training & testing with kernel
-        model = svmtrain(Y(Itrain,i),[(1:numel(Itrain))',K(Itrain,Itrain)],sprintf('-q -s 0 -c %.2f -t 4',svm_c));
-        Ynew = svmpredict(Y(Itest,k),[(1:numel(Itest))',K(Itest,Itrain)],model);
+        model = svmtrain(Y(Itrain,i),X(Itrain,:),sprintf('-q -s 0 -c %.2f -t 0',svm_c));
+        Ynew = svmpredict(Y(Itest,k),X(Itest,:),model);
         Ycol = [Ycol;[Ynew,Itest]];
     end
     Ycol = sortrows(Ycol,size(Ycol,2));
@@ -186,7 +182,7 @@ dlmwrite(sprintf('../results/%s_perfSVM',name{1}),perf)
 perf=perf(1,:);
 % bagging
 Nrep=60;
-per=1;
+per=0.4;
 rand('twister', 0);
 Ybag=Y*0;
 perfBagSVM=[];
@@ -202,8 +198,8 @@ for b=1:Nrep
             BagSize=ceil(numel(Itrain)*per);
             Itrain=randsample(Itrain,BagSize);
             Itest  = find(Ind == k);
-            model = svmtrain(Y(Itrain,i),[(1:numel(Itrain))',K(Itrain,Itrain)],sprintf('-q -s 0 -c %.2f -t 4',svm_c));
-            Ynew = svmpredict(Y(Itest,k),[(1:numel(Itest))',K(Itest,Itrain)],model);
+            model = svmtrain(Y(Itrain,i),X(Itrain,:),sprintf('-q -s 0 -c %.2f -t 0',svm_c));
+            Ynew = svmpredict(Y(Itest,k),X(Itest,:),model);
             Ycol = [Ycol;[Ynew,Itest]];
         end
         Ycol = sortrows(Ycol,size(Ycol,2));
