@@ -2,6 +2,6 @@
 
 start from run_SVM.m
 1. parameter selection on 0.01,0.1,0.5,1,5,10,100
-2. parameter selection on 25% data
+2. parameter selection on 10% data
 3. ensemble size 60
-4. bootstrapping 25%
+4. bootstrapping 40%
